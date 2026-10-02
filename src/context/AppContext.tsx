@@ -6,8 +6,6 @@ interface AppContextType {
   user: User | null;
   currency: 'NGN' | 'USD';
   setCurrency: (c: 'NGN' | 'USD') => void;
-  headingFont: 'syne' | 'fraunces' | 'outfit';
-  setHeadingFont: (f: 'syne' | 'fraunces' | 'outfit') => void;
   formatPrice: (cloth: AkweteCloth | { priceNGN: number; priceUSD: number }) => string;
   cart: OrderItem[];
   addToCart: (cloth: AkweteCloth, quantity?: number, note?: string) => void;
@@ -85,15 +83,6 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Load from localStorage or defaults
   const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
-  const [headingFont, setHeadingFontState] = useState<'syne' | 'fraunces' | 'outfit'>(() => {
-    const saved = localStorage.getItem('akwete_font');
-    return (saved === 'syne' || saved === 'outfit' || saved === 'fraunces') ? saved : 'fraunces';
-  });
-
-  const setHeadingFont = (f: 'syne' | 'fraunces' | 'outfit') => {
-    setHeadingFontState(f);
-    localStorage.setItem('akwete_font', f);
-  };
   
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('akwete_user');
@@ -573,8 +562,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user,
         currency,
         setCurrency,
-        headingFont,
-        setHeadingFont,
         formatPrice,
         cart,
         addToCart,

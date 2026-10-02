@@ -17,12 +17,11 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { CheckoutDrawer } from './components/CheckoutDrawer';
 
 function AppContent() {
-  const { headingFont, isAdminOpen } = useApp();
+  const { isAdminOpen } = useApp();
 
-  // If Admin Workspace is open, render as a dedicated full-screen application
   if (isAdminOpen) {
     return (
-      <div className={`min-h-screen bg-[#FAF9F5] flex flex-col text-stone-900 selection:bg-amber-900 selection:text-white font-theme-${headingFont}`}>
+      <div className="min-h-screen bg-[#FAF9F5] flex flex-col text-stone-900">
         <AdminDashboard />
         <ClothModal />
         <ProducerDetailModal />
@@ -31,22 +30,15 @@ function AppContent() {
   }
 
   return (
-    <div className={`min-h-screen bg-[#FAF9F5] flex flex-col text-stone-900 selection:bg-amber-900 selection:text-white font-theme-${headingFont}`}>
-      {/* Navigation Top Bar Contract */}
+    <div className="min-h-screen bg-[#FAF9F5] flex flex-col text-stone-900">
       <Header />
-
-      {/* Main Content Sections */}
       <main className="flex-1">
         <Hero />
         <ClothCatalog />
         <ProducerSection />
         <HeritageSection />
       </main>
-
-      {/* Quiet Cultural Footer */}
       <Footer />
-
-      {/* Interactive Modals & Drawers */}
       <ClothModal />
       <ProducerDetailModal />
       <DirectMessageModal />
