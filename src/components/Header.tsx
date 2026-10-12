@@ -13,7 +13,8 @@ export const Header: React.FC = () => {
     setIsAuthModalOpen,
     setAuthModalMode,
     setIsBuyerDashboardOpen,
-    setIsSellerDashboardOpen,
+    setIsProducerConsoleOpen,
+    setIsProducerApplyOpen,
     isAdminOpen,
     setIsAdminOpen,
     setIsDirectMessageOpen,
@@ -67,6 +68,11 @@ export const Header: React.FC = () => {
           <a href="#catalog" className="hover:text-stone-950 transition-colors">Collection</a>
           <a href="#weavers" className="hover:text-stone-950 transition-colors">Weavers</a>
           <a href="#heritage" className="hover:text-stone-950 transition-colors">Heritage</a>
+          {(!user || user.role === 'buyer') && (
+            <button onClick={() => setIsProducerApplyOpen(true)} className="text-amber-900 hover:text-amber-950 transition-colors">
+              Sell on Akwete
+            </button>
+          )}
         </nav>
 
         {/* Desktop controls */}
@@ -130,7 +136,7 @@ export const Header: React.FC = () => {
             <button
               onClick={() => {
                 if (user.role === 'admin') setIsAdminOpen(true);
-                else if (user.role === 'producer') setIsSellerDashboardOpen(true);
+                else if (user.role === 'producer') setIsProducerConsoleOpen(true);
                 else setIsBuyerDashboardOpen(true);
               }}
               className="flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 bg-stone-100 hover:bg-stone-200 rounded-lg text-xs font-semibold text-stone-800 transition-colors"
@@ -193,6 +199,14 @@ export const Header: React.FC = () => {
                 {label}
               </a>
             ))}
+            {(!user || user.role === 'buyer') && (
+              <button
+                onClick={() => { setIsProducerApplyOpen(true); closeMobile(); }}
+                className="text-left text-base font-semibold text-amber-900 hover:text-amber-950 py-2.5 transition-colors"
+              >
+                Sell on Akwete
+              </button>
+            )}
           </nav>
 
           {/* Currency */}
@@ -242,7 +256,7 @@ export const Header: React.FC = () => {
               <button
                 onClick={() => {
                   if (user.role === 'admin') setIsAdminOpen(true);
-                  else if (user.role === 'producer') setIsSellerDashboardOpen(true);
+                  else if (user.role === 'producer') setIsProducerConsoleOpen(true);
                   else setIsBuyerDashboardOpen(true);
                   closeMobile();
                 }}

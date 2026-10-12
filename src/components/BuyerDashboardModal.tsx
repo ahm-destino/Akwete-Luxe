@@ -15,6 +15,7 @@ export const BuyerDashboardModal: React.FC = () => {
     producers,
     setMessageTargetProducer,
     setIsDirectMessageOpen,
+    setIsProducerApplyOpen,
     logout,
     formatPrice
   } = useApp();
@@ -61,16 +62,24 @@ export const BuyerDashboardModal: React.FC = () => {
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              logout();
-              setIsBuyerDashboardOpen(false);
-            }}
-            className="self-start sm:self-center flex items-center gap-1.5 text-xs text-stone-500 hover:text-red-700 px-3 py-1.5 rounded-lg border border-stone-200 hover:border-red-200 bg-white transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <button
+              onClick={() => { setIsBuyerDashboardOpen(false); setIsProducerApplyOpen(true); }}
+              className="flex items-center gap-1.5 text-xs text-amber-900 hover:text-amber-950 px-3 py-1.5 rounded-lg border border-amber-200 hover:border-amber-300 bg-amber-50 transition-colors font-semibold"
+            >
+              Sell on Akwete
+            </button>
+            <button
+              onClick={() => {
+                logout();
+                setIsBuyerDashboardOpen(false);
+              }}
+              className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-red-700 px-3 py-1.5 rounded-lg border border-stone-200 hover:border-red-200 bg-white transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
+          </div>
         </div>
 
         {/* Tab Controls */}

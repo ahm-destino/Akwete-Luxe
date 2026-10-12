@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
-import { X, Trash2, ShieldCheck, CheckCircle2, ArrowRight, ShoppingBag } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { X, Trash2, ShieldCheck, CheckCircle2, ArrowRight, ShoppingBag, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Order } from '../types';
+
+const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY as string | undefined;
+const isPaystackConfigured = !!(PAYSTACK_PUBLIC_KEY && PAYSTACK_PUBLIC_KEY.startsWith('pk_'));
 
 export const CheckoutDrawer: React.FC = () => {
   const {
@@ -17,6 +20,8 @@ export const CheckoutDrawer: React.FC = () => {
 
   const [step, setStep] = useState<'cart' | 'checkout' | 'success'>('cart');
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   // Delivery form state
   const [name, setName] = useState(user?.name || '');
@@ -32,16 +37,93 @@ export const CheckoutDrawer: React.FC = () => {
   const totalNGN = cart.reduce((sum, item) => sum + item.cloth.priceNGN * item.quantity, 0);
   const totalUSD = cart.reduce((sum, item) => sum + item.cloth.priceUSD * item.quantity, 0);
 
-  const handleCheckoutSubmit = (e: React.FormEvent) => {
+  // Paystack inline popup handler
+  const initiatePaystackPayment = useCallback(async (orderId: string) => {
+    if (!isPaystackConfigured) {
+      setPaymentError('Card payment is not yet configured. Please use Escrow Bank Transfer.');
+      setProcessingPayment(false);
+      return;
+    }
+
+    try {
+      // Initialize via server to get access code securely
+      const res = await fetch('/api/paystack-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, amountNGN: totalNGN, orderId }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to initialize payment');
+      }
+
+      const { access_code } = await res.json() as { access_code: string; authorization_url: string };
+
+      // Load Paystack inline script dynamically
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.onload = () => {
+        const handler = (window as unknown as Record<string, unknown>).PaystackPop as {
+          setup: (config: Record<string, unknown>) => { openIframe: () => void };
+        };
+        if (!handler) {
+          setPaymentError('Failed to load payment processor.');
+          setProcessingPayment(false);
+          return;
+        }
+        const popup = handler.setup({
+          key: PAYSTACK_PUBLIC_KEY,
+          email,
+          amount: totalNGN * 100,
+          access_code,
+          ref: orderId,
+          onClose: () => {
+            setPaymentError('Payment was not completed. Please try again.');
+            setProcessingPayment(false);
+          },
+          callback: (response: { reference: string }) => {
+            console.log('[Paystack] Payment successful, ref:', response.reference);
+            setProcessingPayment(false);
+            setStep('success');
+          },
+        });
+        popup.openIframe();
+      };
+      document.head.appendChild(script);
+    } catch (err) {
+      console.error('[CheckoutDrawer] Paystack init error:', err);
+      setPaymentError('Payment initialization failed. Please try Escrow Bank Transfer.');
+      setProcessingPayment(false);
+    }
+  }, [email, totalNGN]);
+
+  const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !address) return;
+    setPaymentError(null);
 
-    const order = placeOrder({
+    // For Card Payment, create order first then open Paystack
+    if (paymentMethod === 'Card Payment' && isPaystackConfigured) {
+      setProcessingPayment(true);
+      const order = await placeOrder({
+        name,
+        email,
+        phone: phone || '+234 800 000 0000',
+        address,
+        paymentMethod,
+      });
+      setCompletedOrder(order);
+      await initiatePaystackPayment(order.id);
+      return;
+    }
+
+    // For Escrow or COD — create order directly
+    const order = await placeOrder({
       name,
       email,
       phone: phone || '+234 800 000 0000',
       address,
-      paymentMethod
+      paymentMethod,
     });
 
     setCompletedOrder(order);
@@ -357,6 +439,12 @@ export const CheckoutDrawer: React.FC = () => {
               </span>
             </div>
 
+            {paymentError && (
+              <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {paymentError}
+              </div>
+            )}
+
             {step === 'cart' ? (
               <button
                 onClick={() => setStep('checkout')}
@@ -370,16 +458,24 @@ export const CheckoutDrawer: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setStep('cart')}
-                  className="px-4 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg text-xs font-semibold transition-colors"
+                  disabled={processingPayment}
+                  className="px-4 py-3 bg-stone-200 hover:bg-stone-300 disabled:opacity-50 text-stone-800 rounded-lg text-xs font-semibold transition-colors"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   form="checkout-form"
-                  className="flex-1 py-3 bg-amber-950 hover:bg-amber-900 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors shadow-xs"
+                  disabled={processingPayment}
+                  className="flex-1 py-3 bg-amber-950 hover:bg-amber-900 disabled:opacity-60 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors shadow-xs flex items-center justify-center gap-2"
                 >
-                  Confirm & Place Order
+                  {processingPayment ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Processing Payment…</>
+                  ) : paymentMethod === 'Card Payment' && isPaystackConfigured ? (
+                    'Pay with Card (Paystack)'
+                  ) : (
+                    'Confirm & Place Order'
+                  )}
                 </button>
               </div>
             )}

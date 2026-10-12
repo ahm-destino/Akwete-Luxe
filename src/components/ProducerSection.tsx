@@ -3,7 +3,7 @@ import { MessageCircle, ArrowRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export const ProducerSection: React.FC = () => {
-  const { producers, setActiveProducerModal, cloths } = useApp();
+  const { publicProducers, setActiveProducerModal, cloths } = useApp();
 
   return (
     <section id="weavers" className="py-16 sm:py-24 bg-white border-b border-stone-200">
@@ -24,7 +24,7 @@ export const ProducerSection: React.FC = () => {
 
         {/* Grid — 1 col mobile, 3 col md+ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
-          {producers.map(producer => {
+          {publicProducers.map(producer => {
             const producerCloths = cloths.filter(c => c.producerId === producer.id);
 
             return (
