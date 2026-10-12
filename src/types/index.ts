@@ -18,6 +18,9 @@ export interface Producer {
   rating: number;
   reviewCount: number;
   isGuildCertified: boolean;
+  status?: 'pending' | 'active' | 'suspended'; // approval state of the weaver account
+  profileId?: string; // auth user that owns this weaver account
+  email?: string;
 }
 
 export interface AkweteCloth {
@@ -61,7 +64,27 @@ export interface User {
     postalCode?: string;
   };
   producerId?: string; // If registered as producer
+  producerStatus?: 'pending' | 'active' | 'suspended'; // approval state of their weaver account
   joinedDate: string;
+}
+
+// Fields a buyer submits when applying to become a selling weaver
+export interface ProducerApplication {
+  name: string;
+  nativeTitle: string;
+  village: string;
+  yearsOfExperience: number;
+  specialtyMotif: string;
+  loomType: string;
+  bio: string;
+  phone: string;
+  whatsapp: string;
+  avatarUrl: string;
+}
+
+export interface AppSettings {
+  ngnPerUsd: number;
+  bankDetails: string;
 }
 
 export interface OrderItem {
@@ -83,6 +106,8 @@ export interface Order {
   createdAt: string;
   deliveryAddress: string;
   paymentMethod: 'Escrow Bank Transfer' | 'Card Payment' | 'Artisan Direct COD';
+  paymentRef?: string;
+  paymentVerified?: boolean;
   producerNames: string[];
   loomNote?: string;
   payoutReleased?: boolean;

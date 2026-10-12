@@ -8,12 +8,13 @@ export const CommissionModal: React.FC = () => {
     setIsCommissionModalOpen,
     commissionTargetProducer,
     producers,
+    publicProducers,
     requestCommission,
     user
   } = useApp();
 
   const [selectedProducerId, setSelectedProducerId] = useState<string>(
-    commissionTargetProducer?.id || producers[0].id
+    commissionTargetProducer?.id || publicProducers[0]?.id || producers[0]?.id
   );
   const [motif, setMotif] = useState<string>('Ikaki (Royal Tortoise)');
   const [occasion, setOccasion] = useState<string>('Traditional Wedding (Igba Nkwu)');
@@ -129,7 +130,7 @@ export const CommissionModal: React.FC = () => {
                   Choose Weaver:
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {producers.map(p => (
+                  {publicProducers.map(p => (
                     <button
                       type="button"
                       key={p.id}
