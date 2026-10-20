@@ -128,7 +128,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try { return JSON.parse(saved); } catch { /* ignore */ }
     }
-    return ['cloth-ikaki-royal'];
+    return [];
   });
 
   // Persist cart + favorites to localStorage
@@ -181,12 +181,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ── Cart operations ────────────────────────────────────────
   const addToCart = (cloth: AkweteCloth, quantity: number = 1, note?: string) => {
+    if (!cloth.inStock || cloth.stockCount < 1) return;
     setCart(prev => {
       const existing = prev.find(item => item.cloth.id === cloth.id);
+      const nextQuantity = Math.min(cloth.stockCount, (existing?.quantity ?? 0) + quantity);
       if (existing) {
         return prev.map(item =>
           item.cloth.id === cloth.id
-            ? { ...item, quantity: item.quantity + quantity, customNote: note || item.customNote }
+            ? { ...item, quantity: nextQuantity, customNote: note || item.customNote }
             : item
         );
       }
@@ -206,7 +208,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setCart(prev =>
       prev.map(item =>
-        item.cloth.id === clothId ? { ...item, quantity } : item
+        item.cloth.id === clothId
+          ? { ...item, quantity: Math.min(Math.max(1, quantity), item.cloth.stockCount) }
+          : item
       )
     );
   };

@@ -2,7 +2,7 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 
 export const Footer: React.FC = () => {
-  const { setIsAdminOpen } = useApp();
+  const { setIsAdminOpen, user } = useApp();
 
   return (
     <footer className="bg-white border-t border-stone-200 py-10 text-stone-600 text-xs">
@@ -25,12 +25,12 @@ export const Footer: React.FC = () => {
             <a href="#catalog" className="hover:text-stone-950 transition-colors">Collection</a>
             <a href="#weavers" className="hover:text-stone-950 transition-colors">Weavers</a>
             <a href="#heritage" className="hover:text-stone-950 transition-colors">Heritage</a>
-            <button
+            {user?.role === 'admin' && <button
               onClick={() => setIsAdminOpen(true)}
               className="hover:text-stone-950 transition-colors text-stone-400"
             >
               Admin
-            </button>
+            </button>}
           </nav>
 
           {/* Copyright */}

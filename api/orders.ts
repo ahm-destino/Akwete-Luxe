@@ -1,187 +1,79 @@
-// ============================================================
-// Akwete Luxe — POST /api/orders
-// Creates order + items in Supabase, sends Resend email
-// ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
-// Service role key has full DB access (bypasses RLS for server-side writes)
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-interface OrderItem {
-  clothId: string;
-  clothTitle: string;
-  producerId?: string | null;
-  quantity: number;
-  priceNGN: number;
-  priceUSD: number;
-  customNote: string | null;
-}
-
-interface CreateOrderBody {
-  orderId: string;
-  buyerId: string | null;
-  buyerName: string;
-  buyerEmail: string;
-  buyerPhone: string;
-  totalNGN: number;
-  totalUSD: number;
-  deliveryAddress: string;
-  paymentMethod: 'Escrow Bank Transfer' | 'Card Payment' | 'Artisan Direct COD';
-  producerNames: string[];
-  items: OrderItem[];
-}
+const supabase = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+type RequestedItem = { clothId: string; quantity: number; customNote?: string | null };
+type CreateOrderBody = { orderId: string; buyerId: string | null; buyerName: string; buyerEmail: string; buyerPhone: string; deliveryAddress: string; paymentMethod: 'Escrow Bank Transfer' | 'Card Payment' | 'Artisan Direct COD'; items: RequestedItem[] };
+const validPaymentMethods = new Set(['Escrow Bank Transfer', 'Card Payment', 'Artisan Direct COD']);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const body = req.body as CreateOrderBody;
-  const {
-    orderId,
-    buyerId,
-    buyerName,
-    buyerEmail,
-    buyerPhone,
-    totalNGN,
-    totalUSD,
-    deliveryAddress,
-    paymentMethod,
-    producerNames,
-    items,
-  } = body;
+  if (!body?.orderId || !body.buyerName?.trim() || !body.buyerEmail?.trim() || !body.deliveryAddress?.trim() || !Array.isArray(body.items) || !body.items.length) return res.status(400).json({ error: 'Missing required order details.' });
+  if (!validPaymentMethods.has(body.paymentMethod) || body.items.length > 20) return res.status(400).json({ error: 'Invalid order request.' });
 
-  // Validate required fields
-  if (!orderId || !buyerName || !buyerEmail || !items?.length) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  const requested = new Map<string, { quantity: number; customNote?: string | null }>();
+  for (const item of body.items) {
+    if (!item?.clothId || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20) return res.status(400).json({ error: 'Each item needs a valid quantity.' });
+    const previous = requested.get(item.clothId);
+    requested.set(item.clothId, { quantity: (previous?.quantity ?? 0) + item.quantity, customNote: item.customNote });
   }
 
-  // ── 1. Insert order ──────────────────────────────────────
+  const ids = [...requested.keys()];
+  const { data: cloths, error: clothError } = await supabase.from('cloths').select('id,title,producer_id,producer_name,price_ngn,price_usd,in_stock,stock_count').in('id', ids);
+  if (clothError || !cloths || cloths.length !== ids.length) return res.status(409).json({ error: 'One or more selected pieces are no longer available.' });
+  const reservedCloths: typeof cloths = [];
+  for (const cloth of cloths) {
+    const quantity = requested.get(cloth.id)!.quantity;
+    if (!cloth.in_stock || cloth.stock_count < quantity) return res.status(409).json({ error: `${cloth.title} is no longer available in that quantity.` });
+  }
+
+  // Prices, titles, producers and totals are derived from the catalog here.
+  const totalNGN = cloths.reduce((sum, cloth) => sum + cloth.price_ngn * requested.get(cloth.id)!.quantity, 0);
+  const totalUSD = cloths.reduce((sum, cloth) => sum + cloth.price_usd * requested.get(cloth.id)!.quantity, 0);
+  const producerNames = [...new Set(cloths.map(c => c.producer_name).filter((name): name is string => !!name))];
   const { error: orderError } = await supabase.from('orders').insert({
-    id: orderId,
-    buyer_id: buyerId,
-    buyer_name: buyerName,
-    buyer_email: buyerEmail,
-    buyer_phone: buyerPhone || null,
-    total_ngn: totalNGN,
-    total_usd: totalUSD,
-    status: 'Pending Verification',
-    delivery_address: deliveryAddress,
-    payment_method: paymentMethod,
-    payment_ref: null,
-    payment_verified: false,
-    loom_note: null,
-    payout_released: false,
-    payout_date: null,
-    producer_names: producerNames,
+    id: body.orderId, buyer_id: body.buyerId, buyer_name: body.buyerName.trim(), buyer_email: body.buyerEmail.trim(), buyer_phone: body.buyerPhone?.trim() || null,
+    total_ngn: totalNGN, total_usd: totalUSD, status: 'Pending Verification', delivery_address: body.deliveryAddress.trim(), payment_method: body.paymentMethod,
+    payment_ref: null, payment_verified: false, loom_note: null, payout_released: false, payout_date: null, producer_names: producerNames,
   });
+  if (orderError) return res.status(500).json({ error: 'Could not create the order.' });
+  const { error: itemsError } = await supabase.from('order_items').insert(cloths.map(cloth => ({
+    order_id: body.orderId, cloth_id: cloth.id, producer_id: cloth.producer_id, cloth_title: cloth.title, quantity: requested.get(cloth.id)!.quantity,
+    price_ngn: cloth.price_ngn, price_usd: cloth.price_usd, custom_note: requested.get(cloth.id)!.customNote || null,
+  })));
+  if (itemsError) { await supabase.from('orders').delete().eq('id', body.orderId); return res.status(500).json({ error: 'Could not save order items.' }); }
 
-  if (orderError) {
-    console.error('[/api/orders] order insert error:', orderError);
-    return res.status(500).json({ error: orderError.message });
-  }
-
-  // ── 2. Insert order items ────────────────────────────────
-  const itemInserts = items.map(item => ({
-    order_id: orderId,
-    cloth_id: item.clothId || null,
-    producer_id: item.producerId || null,
-    cloth_title: item.clothTitle,
-    quantity: item.quantity,
-    price_ngn: item.priceNGN,
-    price_usd: item.priceUSD,
-    custom_note: item.customNote || null,
-  }));
-
-  const { error: itemsError } = await supabase.from('order_items').insert(itemInserts);
-
-  if (itemsError) {
-    console.error('[/api/orders] order items insert error:', itemsError);
-    // Don't fail — order is created, items can be re-added
-  }
-
-  // ── 3. Send email via Resend ─────────────────────────────
-  if (process.env.RESEND_API_KEY) {
-    const itemsList = items
-      .map(i => `• ${i.clothTitle} × ${i.quantity} — ₦${i.priceNGN.toLocaleString('en-NG')}`)
-      .join('\n');
-
-    const emailBody = `
-      <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1c1917;">
-        <h1 style="font-size: 24px; color: #78350f; margin-bottom: 8px;">Your Akwete Luxe Order</h1>
-        <p style="color: #57534e; font-size: 14px;">Dear ${buyerName},</p>
-        <p style="color: #57534e; font-size: 14px;">
-          Your order has been received and is now in the Akwete Weavers Cooperative queue for verification.
-        </p>
-        
-        <div style="background: #fafaf9; border: 1px solid #e7e5e4; border-radius: 8px; padding: 16px; margin: 20px 0;">
-          <p style="font-size: 12px; font-weight: bold; color: #292524; margin: 0 0 8px;">Order Reference: ${orderId}</p>
-          <pre style="font-size: 12px; color: #57534e; white-space: pre-wrap;">${itemsList}</pre>
-          <hr style="border-color: #e7e5e4; margin: 12px 0;" />
-          <p style="font-size: 13px; font-weight: bold; color: #292524; margin: 0;">
-            Total: ₦${totalNGN.toLocaleString('en-NG')} ($${totalUSD})
-          </p>
-        </div>
-
-        <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 12px; margin: 16px 0;">
-          <p style="font-size: 12px; color: #713f12; margin: 0;">
-            <strong>Artisan Weavers:</strong> ${producerNames.join(', ')}<br/>
-            <strong>Payment Mode:</strong> ${paymentMethod}<br/>
-            <strong>Delivery Address:</strong> ${deliveryAddress}
-          </p>
-        </div>
-
-        <p style="font-size: 12px; color: #78716c;">
-          You will receive updates as your order progresses through our weaving and dispatch process.
-          Questions? Reply to this email or WhatsApp our secretariat.
-        </p>
-
-        <p style="font-size: 11px; color: #a8a29e; margin-top: 24px; border-top: 1px solid #e7e5e4; padding-top: 16px;">
-          Akwete Luxe · Handwoven Heritage from Akwete Town, Abia State, Nigeria
-        </p>
-      </div>
-    `;
-
-    try {
-      await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: process.env.RESEND_FROM_EMAIL || 'orders@akweteluxe.com',
-          to: [buyerEmail],
-          subject: `Akwete Luxe — Order Confirmation ${orderId}`,
-          html: emailBody,
-        }),
-      });
-
-      // Also notify admin
-      if (process.env.ADMIN_EMAIL) {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: process.env.RESEND_FROM_EMAIL || 'orders@akweteluxe.com',
-            to: [process.env.ADMIN_EMAIL],
-            subject: `New Order: ${orderId} — ${buyerName} (₦${totalNGN.toLocaleString('en-NG')})`,
-            html: `<p>New order received from ${buyerName} (${buyerEmail}) for ₦${totalNGN.toLocaleString('en-NG')}. Order ID: ${orderId}</p>`,
-          }),
-        });
-      }
-    } catch (emailErr) {
-      console.error('[/api/orders] email error:', emailErr);
-      // Non-fatal — order is still created
+  // Compare-and-set stock reservations prevent two checkouts from selling the same piece.
+  for (const cloth of cloths) {
+    const quantity = requested.get(cloth.id)!.quantity;
+    const { data: reserved, error } = await supabase.from('cloths').update({ stock_count: cloth.stock_count - quantity, in_stock: cloth.stock_count - quantity > 0 }).eq('id', cloth.id).eq('stock_count', cloth.stock_count).eq('in_stock', true).select('id');
+    if (error || !reserved?.length) {
+      await Promise.all(reservedCloths.map(previous => supabase.from('cloths').update({ stock_count: previous.stock_count, in_stock: previous.in_stock }).eq('id', previous.id)));
+      await supabase.from('orders').delete().eq('id', body.orderId);
+      return res.status(409).json({ error: `${cloth.title} just sold out. Please refresh your bag and try again.` });
     }
+    reservedCloths.push(cloth);
   }
 
-  return res.status(200).json({ success: true, orderId });
+  if (process.env.RESEND_API_KEY) {
+    const { data: settings } = await supabase.from('app_settings').select('bank_details').eq('id', 1).single();
+    const transferInstructions = settings?.bank_details || 'The cooperative will send verified transfer instructions before payment is due.';
+    const paymentMessage = body.paymentMethod === 'Escrow Bank Transfer'
+      ? `<p><strong>Payment pending:</strong> please make a verified bank transfer using these instructions:</p><p style="white-space:pre-wrap">${transferInstructions}</p>`
+      : body.paymentMethod === 'Card Payment'
+        ? '<p>Your card payment is awaiting confirmation from Paystack.</p>'
+        : '<p>Payment will be arranged for verified delivery or cooperative pickup.</p>';
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM_EMAIL || 'orders@akweteluxe.com', to: [body.buyerEmail.trim()],
+        subject: `Akwete Luxe order received — ${body.orderId}`,
+        html: `<div style="font-family:Arial,sans-serif;color:#1c1917"><h1>Order received</h1><p>Reference: <strong>${body.orderId}</strong></p><p>Order total: <strong>₦${totalNGN.toLocaleString('en-NG')}</strong></p>${paymentMessage}</div>`,
+      }),
+    }).catch(error => console.error('[/api/orders] confirmation email error:', error));
+  }
+
+  return res.status(200).json({ success: true, order: { id: body.orderId, totalNGN, totalUSD, producerNames, paymentMethod: body.paymentMethod, status: 'Pending Verification', paymentVerified: false } });
 }

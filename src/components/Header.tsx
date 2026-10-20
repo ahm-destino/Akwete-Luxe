@@ -34,7 +34,7 @@ export const Header: React.FC = () => {
     <header className="sticky top-0 z-40 bg-[#FAF9F5]/95 backdrop-blur-md border-b border-stone-200">
 
       {/* Admin Proxy Notice */}
-      {activeProxyProducer && (
+      {activeProxyProducer && user?.role === 'admin' && (
         <div className="bg-stone-900 text-stone-300 px-4 py-1.5 text-xs flex items-center justify-between gap-2">
           <span className="truncate">
             Proxy: <strong>{activeProxyProducer.name}</strong>
@@ -90,13 +90,13 @@ export const Header: React.FC = () => {
           </div>
 
           {/* Messages */}
-          <button
-            onClick={() => { setMessageTargetProducer(producers[0]); setIsDirectMessageOpen(true); }}
+          {user?.role === 'admin' && <button
+            onClick={() => user ? setIsBuyerDashboardOpen(true) : (setAuthModalMode('signin'), setIsAuthModalOpen(true))}
             className="p-2 text-stone-500 hover:text-stone-950 rounded-lg transition-colors"
             title="Messages"
           >
             <MessageSquare className="w-4 h-4" />
-          </button>
+          </button>}
 
           {/* Favorites */}
           <button
@@ -120,15 +120,6 @@ export const Header: React.FC = () => {
             {totalCartCount > 0 && (
               <span className="ml-1 text-xs font-bold text-amber-950">({totalCartCount})</span>
             )}
-          </button>
-
-          {/* Admin */}
-          <button
-            onClick={() => setIsAdminOpen(true)}
-            className="text-xs text-stone-400 hover:text-stone-900 px-2 py-1 transition-colors"
-            title="Admin Console"
-          >
-            Admin
           </button>
 
           {/* User */}
@@ -227,7 +218,7 @@ export const Header: React.FC = () => {
           {/* Actions row */}
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={() => { setMessageTargetProducer(producers[0]); setIsDirectMessageOpen(true); closeMobile(); }}
+              onClick={() => { user ? setIsBuyerDashboardOpen(true) : (setAuthModalMode('signin'), setIsAuthModalOpen(true)); closeMobile(); }}
               className="flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-100 text-stone-700 text-xs font-semibold"
             >
               <MessageSquare className="w-4 h-4" /> Messages
@@ -242,12 +233,12 @@ export const Header: React.FC = () => {
               {favorites.length > 0 && <span className="ml-0.5 text-amber-900">({favorites.length})</span>}
             </button>
 
-            <button
+            {user?.role === 'admin' && <button
               onClick={() => { setIsAdminOpen(true); closeMobile(); }}
               className="flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-100 text-stone-500 text-xs font-semibold"
             >
               <Shield className="w-4 h-4" /> Admin
-            </button>
+            </button>}
           </div>
 
           {/* Auth */}

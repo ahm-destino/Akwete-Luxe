@@ -12,6 +12,7 @@ export const ProducerDetailModal: React.FC = () => {
     setCommissionTargetProducer,
     actOnBehalfOfProducer,
     setIsAdminOpen,
+    user,
     formatPrice
   } = useApp();
 
@@ -28,11 +29,12 @@ export const ProducerDetailModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-stone-950/75 backdrop-blur-xs">
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-stone-200 my-auto animate-in fade-in zoom-in-95 duration-200">
+      <div role="dialog" aria-modal="true" aria-label="Weaver profile" className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-stone-200 my-auto animate-in fade-in zoom-in-95 duration-200">
         
         {/* Close Button */}
         <button
           onClick={() => setActiveProducerModal(null)}
+          aria-label="Close weaver profile"
           className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/90 hover:bg-white text-stone-700 hover:text-stone-900 shadow-sm border border-stone-200 transition-colors"
           title="Close profile"
         >
@@ -101,6 +103,13 @@ export const ProducerDetailModal: React.FC = () => {
                 </a>
 
                 <button
+                  onClick={handleCustomOrder}
+                  className="px-4 py-2 bg-amber-950 hover:bg-amber-900 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <ArrowRight className="w-4 h-4" /> Commission a Custom Weave
+                </button>
+
+                {user?.role === 'admin' && <button
                   onClick={() => {
                     setActiveProducerModal(null);
                     actOnBehalfOfProducer(producer.id);
@@ -110,7 +119,7 @@ export const ProducerDetailModal: React.FC = () => {
                 >
                   <UserCheck className="w-3.5 h-3.5 text-amber-400" />
                   <span>Admin: Act on Her Behalf</span>
-                </button>
+                </button>}
               </div>
             </div>
           </div>
