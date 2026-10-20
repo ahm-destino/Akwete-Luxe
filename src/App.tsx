@@ -34,7 +34,7 @@ const ConsoleLoader: React.FC<{ label: string }> = ({ label }) => (
 );
 
 function AppContent() {
-  const { isAdminOpen, isProducerConsoleOpen, user, cloths, publicProducers, activeClothModal, activeProducerModal, setActiveClothModal, setActiveProducerModal } = useApp();
+  const { isAdminOpen, isProducerConsoleOpen, user, adminActingAsProducerId, cloths, publicProducers, activeClothModal, activeProducerModal, setActiveClothModal, setActiveProducerModal } = useApp();
   const syncingHistory = useRef(false);
 
   const openFromLocation = useCallback(() => {
@@ -78,7 +78,7 @@ function AppContent() {
   }
 
   // Full-screen weaver (producer) console
-  if (isProducerConsoleOpen && user?.role === 'producer') {
+  if (isProducerConsoleOpen && (user?.role === 'producer' || (user?.role === 'admin' && !!adminActingAsProducerId))) {
     return (
       <div className="min-h-screen bg-[#FAF9F5] flex flex-col text-stone-900">
         <Suspense fallback={<ConsoleLoader label="Loading Weaver Studio…" />}>

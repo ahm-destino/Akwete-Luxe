@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Producer, AkweteCloth, User, Order, OrderItem, Message, CustomCommission, ProducerApplication, AppSettings } from '../types';
 import { PRODUCERS } from '../data/mockData';
 
@@ -156,20 +156,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCommissionModalOpen, setIsCommissionModalOpen] = useState<boolean>(false);
   const [commissionTargetProducer, setCommissionTargetProducer] = useState<Producer | null>(null);
   
-  // Admin Proxy Weaver State
-  const [adminActingAsProducerId, setAdminActingAsProducerId] = useState<string | null>(() => {
-    return localStorage.getItem('akwete_proxy_producer_id');
-  });
+  // Proxy mode is intentionally session-only. Persisting a target in
+  // localStorage could leak an admin workflow into a later non-admin session.
+  const [adminActingAsProducerId, setAdminActingAsProducerId] = useState<string | null>(null);
 
   const actOnBehalfOfProducer = (producerId: string) => {
+    if (auth.user?.role !== 'admin') return;
     setAdminActingAsProducerId(producerId);
-    localStorage.setItem('akwete_proxy_producer_id', producerId);
   };
 
   const exitProxyMode = () => {
     setAdminActingAsProducerId(null);
-    localStorage.removeItem('akwete_proxy_producer_id');
   };
+
+  useEffect(() => {
+    if (auth.user?.role !== 'admin') setAdminActingAsProducerId(null);
+  }, [auth.user?.role]);
 
   // ── Price formatting ───────────────────────────────────────
   const formatPrice = (cloth: AkweteCloth | { priceNGN: number; priceUSD: number }) => {
