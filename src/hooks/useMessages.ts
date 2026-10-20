@@ -6,7 +6,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { MessageRow, MessageInsert } from '../lib/database.types';
 import { Message, User } from '../types';
-import { INITIAL_MESSAGES } from '../data/mockData';
 import { toast } from '../lib/toast';
 
 function mapRowToMessage(row: MessageRow): Message {
@@ -35,7 +34,7 @@ const isSupabaseConfigured = !!(
 );
 
 export function useMessages(user: User | null) {
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES as Message[]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Track Realtime subscription so we can clean up
@@ -99,7 +98,7 @@ export function useMessages(user: User | null) {
       fetchMessages();
       subscribeToMessages();
     } else {
-      setMessages(INITIAL_MESSAGES as Message[]);
+      setMessages([]);
     }
 
     return () => {

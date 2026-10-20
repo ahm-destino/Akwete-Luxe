@@ -52,7 +52,7 @@ const isSupabaseConfigured = !!(
 );
 
 export function useCommissions(user: User | null) {
-  const [commissions, setCommissions] = useState<CustomCommission[]>([DEMO_COMMISSION]);
+  const [commissions, setCommissions] = useState<CustomCommission[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,7 +77,7 @@ export function useCommissions(user: User | null) {
 
   useEffect(() => {
     if (user) fetchCommissions();
-    else setCommissions([DEMO_COMMISSION]);
+    else setCommissions([]);
   }, [user, fetchCommissions]);
 
   // ── Request commission ─────────────────────────────────────

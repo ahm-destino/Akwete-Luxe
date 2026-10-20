@@ -23,7 +23,12 @@ export const ProducerSection: React.FC = () => {
         </div>
 
         {/* Grid — 1 col mobile, 3 col md+ */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
+        {publicProducers.length === 0 ? (
+          <div className="py-12 px-6 text-center bg-stone-50 border border-stone-200 rounded-2xl">
+            <h3 className="font-serif-display text-xl font-bold text-stone-900">Weaver profiles are coming soon</h3>
+            <p className="mt-2 text-sm text-stone-600">The cooperative is preparing its verified weaver directory.</p>
+          </div>
+        ) : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
           {publicProducers.map(producer => {
             const producerCloths = cloths.filter(c => c.producerId === producer.id);
 
@@ -76,7 +81,7 @@ export const ProducerSection: React.FC = () => {
               </div>
             );
           })}
-        </div>
+        </div>}
 
       </div>
     </section>

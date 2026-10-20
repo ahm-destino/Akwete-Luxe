@@ -14,7 +14,6 @@ export const BuyerAuthModal: React.FC = () => {
     setIsAuthModalOpen,
     authModalMode,
     setAuthModalMode,
-    signupBuyer,
     loginAsBuyer,
     loginAsProducer,
     loginAsAdmin,
@@ -44,7 +43,12 @@ export const BuyerAuthModal: React.FC = () => {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { name, role: 'buyer' } },
+        options: {
+          data: { name, role: 'buyer' },
+          // Use the deployed origin in production instead of relying solely
+          // on Supabase's dashboard default (which is often localhost).
+          emailRedirectTo: window.location.origin,
+        },
       });
 
       if (error) {
@@ -67,8 +71,7 @@ export const BuyerAuthModal: React.FC = () => {
       return;
     }
 
-    // Offline / demo mode
-    signupBuyer({ name, email, phone, city, country, password });
+    setLocalError('Account sign-up is temporarily unavailable. Please try again shortly.');
     setSubmitting(false);
   };
 
@@ -90,9 +93,7 @@ export const BuyerAuthModal: React.FC = () => {
       return;
     }
 
-    // Offline / demo mode
-    loginAsBuyer({ name: email.split('@')[0], email });
-    setIsAuthModalOpen(false);
+    setLocalError('Sign-in is temporarily unavailable. Please try again shortly.');
     setSubmitting(false);
   };
 

@@ -6,7 +6,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { ProducerRow, ProducerInsert, ProducerUpdate } from '../lib/database.types';
 import { Producer, ProducerApplication } from '../types';
-import { PRODUCERS } from '../data/mockData';
 import { toast } from '../lib/toast';
 
 // Map DB row → app Producer type
@@ -72,7 +71,7 @@ const isSupabaseConfigured = !!(
 );
 
 export function useProducers() {
-  const [producers, setProducers] = useState<Producer[]>(PRODUCERS);
+  const [producers, setProducers] = useState<Producer[]>([]);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,7 +79,11 @@ export function useProducers() {
   // (RLS decides visibility: public sees active, a weaver also sees their own,
   //  admins see every row including pending applications.)
   const fetchProducers = useCallback(async () => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) {
+      setProducers([]);
+      setError('The weaver directory is not configured.');
+      return;
+    }
 
     setLoading(true);
     const { data, error } = await supabase
@@ -92,12 +95,12 @@ export function useProducers() {
       console.error('[useProducers] fetch error:', error);
       setError(error.message);
       // Fallback to mock data
-      setProducers(PRODUCERS);
-    } else if (data && data.length > 0) {
+      setProducers([]);
+    } else if (data) {
       setProducers((data as ProducerRow[]).map(mapRowToProducer));
     } else {
       // DB empty — use mock data
-      setProducers(PRODUCERS);
+      setProducers([]);
     }
     setLoading(false);
   }, []);

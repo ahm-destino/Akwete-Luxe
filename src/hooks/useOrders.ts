@@ -55,7 +55,7 @@ const DEMO_ORDER: Order = {
 };
 
 export function useOrders(user: User | null) {
-  const [orders, setOrders] = useState<Order[]>([DEMO_ORDER]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -135,7 +135,7 @@ export function useOrders(user: User | null) {
 
   useEffect(() => {
     if (user) fetchOrders();
-    else setOrders([DEMO_ORDER]);
+    else setOrders([]);
   }, [user, fetchOrders]);
 
   // ── Place order ────────────────────────────────────────────

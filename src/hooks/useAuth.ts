@@ -136,6 +136,7 @@ export function useAuth() {
           name: data.name,
           role: 'buyer',
         },
+        emailRedirectTo: window.location.origin,
       },
     });
 
