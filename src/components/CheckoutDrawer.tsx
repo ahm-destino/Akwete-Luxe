@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { X, Trash2, ShieldCheck, CheckCircle2, ArrowRight, ShoppingBag, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Order } from '../types';
@@ -15,7 +15,9 @@ export const CheckoutDrawer: React.FC = () => {
     updateCartQuantity,
     formatPrice,
     placeOrder,
-    user
+    user,
+    settings,
+    currency
   } = useApp();
 
   const [step, setStep] = useState<'cart' | 'checkout' | 'success'>('cart');
@@ -32,10 +34,25 @@ export const CheckoutDrawer: React.FC = () => {
   );
   const [paymentMethod, setPaymentMethod] = useState<'Escrow Bank Transfer' | 'Card Payment' | 'Artisan Direct COD'>('Escrow Bank Transfer');
 
-  if (!isCartOpen) return null;
-
   const totalNGN = cart.reduce((sum, item) => sum + item.cloth.priceNGN * item.quantity, 0);
   const totalUSD = cart.reduce((sum, item) => sum + item.cloth.priceUSD * item.quantity, 0);
+
+  useEffect(() => {
+    if (!user) return;
+    setName(current => current || user.name || '');
+    setEmail(current => current || user.email || '');
+    setPhone(current => current || user.phone || '');
+    setAddress(current => current || (user.address ? `${user.address.street}, ${user.address.city}, ${user.address.country}` : ''));
+  }, [user]);
+
+  useEffect(() => {
+    if (!isCartOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') handleClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKeyDown); document.body.style.overflow = previousOverflow; };
+  }, [isCartOpen]);
 
   // Paystack inline popup handler
   const initiatePaystackPayment = useCallback(async (orderId: string) => {
@@ -50,7 +67,7 @@ export const CheckoutDrawer: React.FC = () => {
       const res = await fetch('/api/paystack-init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, amountNGN: totalNGN, orderId }),
+        body: JSON.stringify({ email, orderId }),
       });
 
       if (!res.ok) {
@@ -74,7 +91,6 @@ export const CheckoutDrawer: React.FC = () => {
         const popup = handler.setup({
           key: PAYSTACK_PUBLIC_KEY,
           email,
-          amount: totalNGN * 100,
           access_code,
           ref: orderId,
           onClose: () => {
@@ -89,13 +105,17 @@ export const CheckoutDrawer: React.FC = () => {
         });
         popup.openIframe();
       };
+      script.onerror = () => {
+        setPaymentError('Payment processor could not be loaded. Please try again or choose bank transfer.');
+        setProcessingPayment(false);
+      };
       document.head.appendChild(script);
     } catch (err) {
       console.error('[CheckoutDrawer] Paystack init error:', err);
       setPaymentError('Payment initialization failed. Please try Escrow Bank Transfer.');
       setProcessingPayment(false);
     }
-  }, [email, totalNGN]);
+  }, [email]);
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,29 +125,34 @@ export const CheckoutDrawer: React.FC = () => {
     // For Card Payment, create order first then open Paystack
     if (paymentMethod === 'Card Payment' && isPaystackConfigured) {
       setProcessingPayment(true);
-      const order = await placeOrder({
-        name,
-        email,
-        phone: phone || '+234 800 000 0000',
-        address,
-        paymentMethod,
-      });
-      setCompletedOrder(order);
-      await initiatePaystackPayment(order.id);
+      try {
+        // A closed/failed Paystack popup must be retryable without creating a
+        // duplicate order or relying on a cart that was already reserved.
+        if (completedOrder) {
+          await initiatePaystackPayment(completedOrder.id);
+          return;
+        }
+        const order = await placeOrder({ name, email, phone, address, paymentMethod });
+        setCompletedOrder(order);
+        await initiatePaystackPayment(order.id);
+      } catch (err) {
+        setPaymentError(err instanceof Error ? err.message : 'Could not place your order. Please try again.');
+        setProcessingPayment(false);
+      }
       return;
     }
 
     // For Escrow or COD — create order directly
-    const order = await placeOrder({
-      name,
-      email,
-      phone: phone || '+234 800 000 0000',
-      address,
-      paymentMethod,
-    });
-
-    setCompletedOrder(order);
-    setStep('success');
+    try {
+      setProcessingPayment(true);
+      const order = await placeOrder({ name, email, phone, address, paymentMethod });
+      setCompletedOrder(order);
+      setStep('success');
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : 'Could not place your order. Please try again.');
+    } finally {
+      setProcessingPayment(false);
+    }
   };
 
   const handleClose = () => {
@@ -136,9 +161,11 @@ export const CheckoutDrawer: React.FC = () => {
     setCompletedOrder(null);
   };
 
+  if (!isCartOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-stone-950/70 backdrop-blur-xs flex justify-end">
-      <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-300">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-stone-950/70 backdrop-blur-xs flex justify-end" onMouseDown={handleClose}>
+      <div role="dialog" aria-modal="true" aria-label="Shopping bag and checkout" onMouseDown={event => event.stopPropagation()} className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-300">
         
         {/* Top Bar */}
         <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50">
@@ -153,6 +180,7 @@ export const CheckoutDrawer: React.FC = () => {
 
           <button
             onClick={handleClose}
+            aria-label="Close bag"
             className="p-1.5 rounded-full hover:bg-stone-200 text-stone-500 hover:text-stone-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -337,7 +365,14 @@ export const CheckoutDrawer: React.FC = () => {
                     </div>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2.5 rounded-lg border border-stone-200 hover:bg-stone-50 cursor-pointer">
+                  {paymentMethod === 'Escrow Bank Transfer' && (
+                    <div className="ml-8 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-stone-700">
+                      <strong className="block text-stone-900 mb-1">Transfer instructions</strong>
+                      {settings.bankDetails || 'Bank-transfer details are being confirmed by the cooperative. Do not transfer funds until the order confirmation email provides verified account details.'}
+                    </div>
+                  )}
+
+                  {isPaystackConfigured && <label className="flex items-center gap-2 p-2.5 rounded-lg border border-stone-200 hover:bg-stone-50 cursor-pointer">
                     <input
                       type="radio"
                       name="payment"
@@ -353,7 +388,7 @@ export const CheckoutDrawer: React.FC = () => {
                         Immediate secure processing with bank 3D-secure
                       </span>
                     </div>
-                  </label>
+                  </label>}
 
                   <label className="flex items-center gap-2 p-2.5 rounded-lg border border-stone-200 hover:bg-stone-50 cursor-pointer">
                     <input
@@ -398,7 +433,7 @@ export const CheckoutDrawer: React.FC = () => {
 
               <div className="p-4 bg-stone-50 rounded-xl border border-stone-200 text-left text-xs space-y-2">
                 <div className="flex justify-between border-b border-stone-200 pb-1.5">
-                  <span className="text-stone-500">Total Paid:</span>
+                  <span className="text-stone-500">{completedOrder.paymentVerified ? 'Total Paid:' : 'Order total:'}</span>
                   <span className="font-bold text-stone-900">
                     ₦{completedOrder.totalNGN.toLocaleString('en-NG')} (${completedOrder.totalUSD})
                   </span>
@@ -417,6 +452,13 @@ export const CheckoutDrawer: React.FC = () => {
                 </div>
               </div>
 
+              {completedOrder.paymentMethod === 'Escrow Bank Transfer' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-left text-xs text-stone-700">
+                  <strong className="block text-stone-900 mb-1">Payment pending — verified bank transfer required</strong>
+                  {settings.bankDetails || 'Verified transfer instructions will be sent by the cooperative before payment is due.'}
+                </div>
+              )}
+
               <button
                 onClick={handleClose}
                 className="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-xs font-semibold transition-colors"
@@ -434,8 +476,7 @@ export const CheckoutDrawer: React.FC = () => {
             <div className="flex items-center justify-between text-xs">
               <span className="text-stone-500">Subtotal:</span>
               <span className="font-serif-display text-2xl font-bold text-stone-900 tabular-nums">
-                ₦{totalNGN.toLocaleString('en-NG')}{' '}
-                <span className="text-xs font-sans text-stone-400 font-normal">(${totalUSD})</span>
+                {currency === 'NGN' ? `₦${totalNGN.toLocaleString('en-NG')}` : `$${totalUSD.toLocaleString('en-US')}`}
               </span>
             </div>
 

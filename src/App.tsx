@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useRef } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
@@ -15,6 +15,7 @@ import { BuyerDashboardModal } from './components/BuyerDashboardModal';
 import { ProducerApplyModal } from './components/ProducerApplyModal';
 import { CheckoutDrawer } from './components/CheckoutDrawer';
 import { Toaster } from './components/Toaster';
+import { ResetPasswordPage } from './components/ResetPasswordPage';
 
 // The two full-screen consoles are only ever opened by admins / weavers, so
 // they're code-split out of the main bundle that every buyer downloads.
@@ -33,10 +34,37 @@ const ConsoleLoader: React.FC<{ label: string }> = ({ label }) => (
 );
 
 function AppContent() {
-  const { isAdminOpen, isProducerConsoleOpen } = useApp();
+  const { isAdminOpen, isProducerConsoleOpen, user, cloths, publicProducers, activeClothModal, activeProducerModal, setActiveClothModal, setActiveProducerModal } = useApp();
+  const syncingHistory = useRef(false);
+
+  const openFromLocation = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cloth = cloths.find(item => item.id === params.get('cloth'));
+    const producer = publicProducers.find(item => item.id === params.get('weaver'));
+    if (cloth || producer || (!params.has('cloth') && !params.has('weaver'))) {
+      syncingHistory.current = true;
+      setActiveClothModal(cloth || null);
+      setActiveProducerModal(producer || null);
+    }
+  }, [cloths, publicProducers, setActiveClothModal, setActiveProducerModal]);
+
+  useEffect(() => {
+    openFromLocation();
+    window.addEventListener('popstate', openFromLocation);
+    return () => window.removeEventListener('popstate', openFromLocation);
+  }, [openFromLocation]);
+
+  useEffect(() => {
+    if (syncingHistory.current) { syncingHistory.current = false; return; }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('cloth'); url.searchParams.delete('weaver');
+    if (activeClothModal) url.searchParams.set('cloth', activeClothModal.id);
+    if (activeProducerModal) url.searchParams.set('weaver', activeProducerModal.id);
+    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [activeClothModal, activeProducerModal]);
 
   // Full-screen admin console
-  if (isAdminOpen) {
+  if (isAdminOpen && user?.role === 'admin') {
     return (
       <div className="min-h-screen bg-[#FAF9F5] flex flex-col text-stone-900">
         <Suspense fallback={<ConsoleLoader label="Loading Atelier Suite…" />}>
@@ -50,7 +78,7 @@ function AppContent() {
   }
 
   // Full-screen weaver (producer) console
-  if (isProducerConsoleOpen) {
+  if (isProducerConsoleOpen && user?.role === 'producer') {
     return (
       <div className="min-h-screen bg-[#FAF9F5] flex flex-col text-stone-900">
         <Suspense fallback={<ConsoleLoader label="Loading Weaver Studio…" />}>
@@ -86,6 +114,7 @@ function AppContent() {
 }
 
 export default function App() {
+  if (window.location.pathname === '/reset-password') return <ResetPasswordPage />;
   return (
     <AppProvider>
       <AppContent />

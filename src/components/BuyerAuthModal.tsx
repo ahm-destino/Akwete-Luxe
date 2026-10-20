@@ -318,8 +318,7 @@ export const BuyerAuthModal: React.FC = () => {
             </form>
           )}
 
-          {/* Quick Demo Switcher Section */}
-          <div className="mt-5 pt-4 border-t border-stone-200">
+          {false && <div className="mt-5 pt-4 border-t border-stone-200">
             <span className="text-[11px] font-medium text-stone-400 block mb-2 text-center">
               Quick Test Accounts (Demo Mode)
             </span>
@@ -360,7 +359,7 @@ export const BuyerAuthModal: React.FC = () => {
                 <span className="text-amber-200 font-semibold">Admin Panel →</span>
               </button>
             </div>
-          </div>
+          </div>}
 
         </div>
       </div>

@@ -35,6 +35,7 @@ export const BuyerDashboardModal: React.FC = () => {
         {/* Close Button */}
         <button
           onClick={() => setIsBuyerDashboardOpen(false)}
+          aria-label="Close account dashboard"
           className="absolute top-4 right-4 z-20 p-2.5 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-800 transition-colors"
         >
           <X className="w-5 h-5" />

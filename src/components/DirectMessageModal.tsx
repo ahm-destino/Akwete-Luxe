@@ -24,8 +24,8 @@ export const DirectMessageModal: React.FC = () => {
   // Filter messages between current user and this producer
   const activeThread = messages.filter(
     m =>
-      (m.receiverId === currentProducer.id && (m.senderId === user?.id || m.senderId === 'buyer-demo-1')) ||
-      (m.senderId === currentProducer.id && (m.receiverId === user?.id || m.receiverId === 'buyer-demo-1'))
+      (m.receiverId === currentProducer.id && (m.senderId === user?.id || (!user && m.senderId === 'guest-buyer'))) ||
+      (m.senderId === currentProducer.id && (m.receiverId === user?.id || (!user && m.receiverId === 'guest-buyer')))
   );
 
   const handleSend = (e: React.FormEvent) => {
@@ -50,7 +50,7 @@ export const DirectMessageModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-stone-950/75 backdrop-blur-xs">
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-stone-200 my-auto flex flex-col h-[650px] max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+      <div role="dialog" aria-modal="true" aria-label="Messages with weaver" className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-stone-200 my-auto flex flex-col h-[650px] max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header Bar */}
         <div className="p-4 sm:p-5 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
@@ -62,7 +62,6 @@ export const DirectMessageModal: React.FC = () => {
                 className="w-12 h-12 rounded-full object-cover border-2 border-stone-300"
                 referrerPolicy="no-referrer"
               />
-              <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -81,6 +80,7 @@ export const DirectMessageModal: React.FC = () => {
 
           <button
             onClick={() => setIsDirectMessageOpen(false)}
+            aria-label="Close messages"
             className="p-2 rounded-full hover:bg-stone-200 text-stone-500 hover:text-stone-800 transition-colors"
           >
             <X className="w-5 h-5" />

@@ -10,7 +10,10 @@ export const ClothModal: React.FC = () => {
     addToCart,
     favorites,
     toggleFavorite,
-    producers
+    producers,
+    setMessageTargetProducer,
+    setMessageTargetCloth,
+    setIsDirectMessageOpen,
   } = useApp();
 
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
@@ -28,6 +31,7 @@ export const ClothModal: React.FC = () => {
   ];
 
   const handleAddToCart = () => {
+    if (!cloth.inStock || cloth.stockCount < 1) return;
     addToCart(cloth, 1);
     setIsAddedFeedback(true);
     setTimeout(() => {
@@ -39,11 +43,12 @@ export const ClothModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-stone-950/70 backdrop-blur-xs">
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-xl overflow-hidden border border-stone-200 my-auto animate-in fade-in zoom-in-95 duration-200">
+      <div role="dialog" aria-modal="true" aria-label="Cloth details" className="relative w-full max-w-3xl bg-white rounded-2xl shadow-xl overflow-hidden border border-stone-200 my-auto animate-in fade-in zoom-in-95 duration-200">
         
         {/* Close Button */}
         <button
           onClick={() => setActiveClothModal(null)}
+          aria-label="Close cloth details"
           className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/90 hover:bg-white text-stone-700 hover:text-stone-950 shadow-sm border border-stone-200 transition-colors"
           title="Close"
         >
@@ -95,6 +100,7 @@ export const ClothModal: React.FC = () => {
                   <span>Woven by {producer.name}</span>
                   <button
                     onClick={() => toggleFavorite(cloth.id)}
+                    aria-label={isFav ? 'Remove from saved cloths' : 'Save cloth'}
                     className="text-stone-400 hover:text-red-600"
                   >
                     <Heart className={`w-4 h-4 ${isFav ? 'fill-red-600 text-red-600' : ''}`} />
@@ -153,10 +159,11 @@ export const ClothModal: React.FC = () => {
               <div className="flex gap-2">
                 <button
                   onClick={handleAddToCart}
-                  className="flex-1 py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+                  disabled={!cloth.inStock || cloth.stockCount < 1}
+                  className="flex-1 py-3 bg-stone-900 hover:bg-stone-800 disabled:bg-stone-400 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
                 >
                   <ShoppingBag className="w-4 h-4" />
-                  <span>Add to Bag</span>
+                  <span>{cloth.inStock && cloth.stockCount > 0 ? 'Add to Bag' : 'Sold Out'}</span>
                 </button>
 
                 <a
@@ -169,6 +176,18 @@ export const ClothModal: React.FC = () => {
                   <span>WhatsApp</span>
                 </a>
               </div>
+
+              <button
+                onClick={() => {
+                  setMessageTargetProducer(producer);
+                  setMessageTargetCloth(cloth);
+                  setActiveClothModal(null);
+                  setIsDirectMessageOpen(true);
+                }}
+                className="w-full py-2.5 border border-stone-300 hover:border-amber-900 text-stone-800 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" /> Message about this cloth
+              </button>
             </div>
 
           </div>

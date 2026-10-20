@@ -4,7 +4,7 @@
 // ============================================================
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { OrderRow, OrderItemRow, OrderInsert, OrderItemInsert } from '../lib/database.types';
+import { OrderRow, OrderItemRow } from '../lib/database.types';
 import { Order, OrderItem, User } from '../types';
 import { toast } from '../lib/toast';
 
@@ -150,6 +150,11 @@ export function useOrders(user: User | null) {
     },
     userId: string | undefined
   ): Promise<Order> => {
+    if (!cart.length) throw new Error('Your bag is empty.');
+    if (cart.some(item => !item.cloth.inStock || item.quantity > item.cloth.stockCount)) {
+      throw new Error('One or more pieces are no longer available in the requested quantity.');
+    }
+
     const totalNGN = cart.reduce((sum, item) => sum + item.cloth.priceNGN * item.quantity, 0);
     const totalUSD = cart.reduce((sum, item) => sum + item.cloth.priceUSD * item.quantity, 0);
     const uniqueProducers = Array.from(new Set(cart.map(i => i.cloth.producerName)));
@@ -171,11 +176,7 @@ export function useOrders(user: User | null) {
       producerNames: uniqueProducers,
     };
 
-    // Optimistic update
-    setOrders(prev => [newOrder, ...prev]);
-
     if (isSupabaseConfigured) {
-      // Use API route for order creation (handles email notification too)
       try {
         const res = await fetch('/api/orders', {
           method: 'POST',
@@ -186,72 +187,29 @@ export function useOrders(user: User | null) {
             buyerName: deliveryDetails.name,
             buyerEmail: deliveryDetails.email,
             buyerPhone: deliveryDetails.phone,
-            totalNGN,
-            totalUSD,
             deliveryAddress: deliveryDetails.address,
             paymentMethod: deliveryDetails.paymentMethod,
-            producerNames: uniqueProducers,
             items: cart.map(item => ({
               clothId: item.cloth.id,
-              clothTitle: item.cloth.title,
-              producerId: item.cloth.producerId,
               quantity: item.quantity,
-              priceNGN: item.cloth.priceNGN,
-              priceUSD: item.cloth.priceUSD,
               customNote: item.customNote ?? null,
             })),
           }),
         });
 
-        if (!res.ok) {
-          console.error('[useOrders] API order creation failed');
-        }
+        const payload = await res.json() as { error?: string; order?: Partial<Order> };
+        if (!res.ok) throw new Error(payload.error || 'Could not save your order.');
+        const savedOrder = { ...newOrder, ...payload.order, items: [...cart] } as Order;
+        setOrders(prev => [savedOrder, ...prev]);
+        return savedOrder;
       } catch (err) {
         console.error('[useOrders] API error:', err);
-        // Fall back to direct Supabase insert
-        const orderInsert: OrderInsert = {
-          id: orderId,
-          buyer_id: userId || null,
-          buyer_name: deliveryDetails.name,
-          buyer_email: deliveryDetails.email,
-          buyer_phone: deliveryDetails.phone || null,
-          total_ngn: totalNGN,
-          total_usd: totalUSD,
-          status: 'Pending Verification',
-          delivery_address: deliveryDetails.address,
-          payment_method: deliveryDetails.paymentMethod,
-          payment_ref: null,
-          payment_verified: false,
-          loom_note: null,
-          payout_released: false,
-          payout_date: null,
-          producer_names: uniqueProducers,
-        };
-
-        const { data: orderData, error: orderError } = await supabase
-          .from('orders')
-          .insert(orderInsert)
-          .select()
-          .single();
-
-        if (!orderError && orderData) {
-          // Insert order items
-          const itemInserts: OrderItemInsert[] = cart.map(item => ({
-            order_id: orderId,
-            cloth_id: item.cloth.id || null,
-            producer_id: item.cloth.producerId || null,
-            cloth_title: item.cloth.title,
-            quantity: item.quantity,
-            price_ngn: item.cloth.priceNGN,
-            price_usd: item.cloth.priceUSD,
-            custom_note: item.customNote || null,
-          }));
-
-          await supabase.from('order_items').insert(itemInserts);
-        }
+        throw err instanceof Error ? err : new Error('Could not save your order.');
       }
     }
 
+    // Local development only. Production always uses the server-side order API.
+    setOrders(prev => [newOrder, ...prev]);
     return newOrder;
   }, []);
 

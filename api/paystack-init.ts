@@ -14,7 +14,6 @@ const supabase = createClient(
 
 interface InitPaystackBody {
   email: string;
-  amountNGN: number; // in kobo (multiply by 100)
   orderId: string;
   metadata?: Record<string, unknown>;
 }
@@ -24,18 +23,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { email, amountNGN, orderId, metadata } = req.body as InitPaystackBody;
+  const { email, orderId, metadata } = req.body as InitPaystackBody;
 
-  if (!email || !amountNGN || !orderId) {
-    return res.status(400).json({ error: 'email, amountNGN, and orderId are required' });
+  if (!email || !orderId) {
+    return res.status(400).json({ error: 'email and orderId are required' });
   }
 
   if (!process.env.PAYSTACK_SECRET_KEY) {
     return res.status(500).json({ error: 'Paystack not configured on server' });
   }
 
-  // Convert to kobo (Paystack expects amounts in kobo)
-  const amountKobo = Math.round(amountNGN * 100);
+  // Never accept a charge amount from the browser. It is derived from the
+  // persisted order, which was itself priced by /api/orders from inventory.
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id,total_ngn,buyer_email,payment_method')
+    .eq('id', orderId)
+    .single();
+  if (orderError || !order || order.buyer_email.toLowerCase() !== email.trim().toLowerCase()) {
+    return res.status(404).json({ error: 'Order not found for this email address.' });
+  }
+  if (order.payment_method !== 'Card Payment' || !Number.isInteger(order.total_ngn) || order.total_ngn < 1) {
+    return res.status(400).json({ error: 'This order is not eligible for card payment.' });
+  }
+  const amountKobo = order.total_ngn * 100;
 
   // Generate a unique reference
   const reference = `AKW-${orderId}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;

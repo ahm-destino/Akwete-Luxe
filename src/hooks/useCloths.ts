@@ -6,7 +6,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { ClothRow, ClothInsert, ClothUpdate } from '../lib/database.types';
 import { AkweteCloth } from '../types';
-import { AKWETE_CLOTHS } from '../data/mockData';
 import { toast } from '../lib/toast';
 
 // Map DB row → app AkweteCloth type
@@ -73,7 +72,10 @@ const isSupabaseConfigured = !!(
 );
 
 export function useCloths() {
-  const [cloths, setCloths] = useState<AkweteCloth[]>(AKWETE_CLOTHS);
+  // Never substitute sample merchandise for a live catalog. An unavailable or
+  // empty database must remain visibly unavailable/empty rather than sell data
+  // that cannot be fulfilled.
+  const [cloths, setCloths] = useState<AkweteCloth[]>([]);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,11 +92,9 @@ export function useCloths() {
     if (error) {
       console.error('[useCloths] fetch error:', error);
       setError(error.message);
-      setCloths(AKWETE_CLOTHS);
-    } else if (data && data.length > 0) {
+      setCloths([]);
+    } else if (data) {
       setCloths((data as ClothRow[]).map(mapRowToCloth));
-    } else {
-      setCloths(AKWETE_CLOTHS);
     }
     setLoading(false);
   }, []);
