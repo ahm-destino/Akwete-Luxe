@@ -753,7 +753,13 @@ export const AdminDashboard: React.FC = () => {
               <h1 className="font-serif-display text-3xl font-bold text-stone-900 tracking-tight">Artisan Proxy Operations</h1>
               <p className="mt-1 text-sm text-stone-600">Publish and represent elder weavers who do not use smartphones.</p>
             </div>
-            <div className="bg-white rounded-3xl border border-stone-200/90 p-8 sm:p-10 shadow-xs flex flex-col md:flex-row items-center gap-8">
+            {!currentProxyWeaver ? (
+              <div className="bg-white rounded-3xl border border-stone-200/90 p-8 sm:p-10 shadow-xs text-center">
+                <h2 className="font-serif-display text-2xl font-bold text-stone-900">No weaver is available to proxy</h2>
+                <p className="mt-2 text-sm text-stone-600">Register or approve a weaver before opening a Weaver Studio on their behalf.</p>
+                <button onClick={() => { setActiveTab('weavers'); setShowAddWeaver(true); }} className="mt-5 bg-amber-950 hover:bg-amber-900 text-white text-xs font-semibold px-5 py-3 rounded-xl">Register a Weaver</button>
+              </div>
+            ) : <div className="bg-white rounded-3xl border border-stone-200/90 p-8 sm:p-10 shadow-xs flex flex-col md:flex-row items-center gap-8">
               <img src={currentProxyWeaver.avatarUrl} alt="" className="w-36 h-36 rounded-3xl object-cover border-2 border-stone-300 shadow-sm shrink-0" />
               <div className="space-y-3 flex-1 text-center md:text-left">
                 <span className="text-xs font-bold text-amber-900 uppercase tracking-widest">Active Elder Representation</span>
@@ -764,7 +770,7 @@ export const AdminDashboard: React.FC = () => {
                   <button onClick={openAddCloth} className="bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold px-5 py-3 rounded-2xl flex items-center gap-2 shadow-xs"><Plus className="w-4 h-4" /> List a Piece for Them</button>
                 </div>
               </div>
-            </div>
+            </div>}
           </div>
         )}
       </main>

@@ -1,10 +1,9 @@
 -- ============================================================
--- Akwete Luxe — Supabase PostgreSQL Schema (canonical, fresh install)
+-- Akwete Luxe — Supabase PostgreSQL Schema (canonical production schema)
 -- Run this in: Supabase Dashboard → SQL Editor → New Query
 --
--- If your database ALREADY has an earlier version of this schema,
--- do NOT re-run this file — run supabase/migrations/0001_producer_backend.sql
--- instead (it is idempotent and upgrades an existing database in place).
+-- This is the only database setup file. It includes the production schema,
+-- RLS policies, producer approval flow, and the order-policy recursion fix.
 -- ============================================================
 
 -- Enable UUID extension
@@ -249,6 +248,15 @@ returns text language sql security definer stable as $$
   select producer_id from public.profiles where id = auth.uid();
 $$;
 
+-- Checks order ownership without recursively evaluating orders/order_items RLS.
+create or replace function public.is_order_producer(target_order_id text)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.order_items
+    where order_id = target_order_id and producer_id = public.current_producer_id()
+  );
+$$;
+
 -- True only when the current user is a producer whose weaver account is active.
 create or replace function public.is_active_producer()
 returns boolean language sql security definer stable as $$
@@ -333,9 +341,9 @@ create policy "Admins manage cloths"        on public.cloths for all
 create policy "Buyers view own orders"     on public.orders for select using (auth.uid() = buyer_id);
 create policy "Buyers insert orders"       on public.orders for insert with check (auth.uid() = buyer_id);
 create policy "Producers view their orders" on public.orders for select
-  using (id in (select order_id from public.order_items where producer_id = public.current_producer_id()));
+  using (public.is_order_producer(id));
 create policy "Producers update their orders" on public.orders for update
-  using (id in (select order_id from public.order_items where producer_id = public.current_producer_id()));
+  using (public.is_order_producer(id));
 create policy "Admins manage all orders"   on public.orders for all
   using (public.is_admin()) with check (public.is_admin());
 
